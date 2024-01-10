@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 contract Bank{
 
 //setAdmin
-address public admin;
+address  admin;
 //balances User address => amount
 mapping(address => uint) public userBalances;
 
@@ -52,5 +52,6 @@ return top3Address;
 function withdraw()public {
 require(msg.sender==admin,"only admin can withdraw eth");
 payable(msg.sender).transfer(totalBalances);
+totalBalances=0;
 }
 }
