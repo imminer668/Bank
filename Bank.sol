@@ -33,7 +33,7 @@ contract Bank {
         userBalances[msg.sender] = data;
         totalBalances = totalBalances + msg.value;
         sort(msg.sender, data);
-        emit Deposit(msg.sender, msg.value, userBalances, totalBalances);
+        emit Deposit(msg.sender, msg.value, data, totalBalances);
     }
 
     function sort(address s, uint256 data) internal {
@@ -60,7 +60,7 @@ contract Bank {
         return top3Address;
     }
 
-    function WithdrawWithAdmin() public {
+    function withdrawWithAdmin() public {
         require(msg.sender == admin, "Only admin can withdraw eth.");
         payable(msg.sender).transfer(totalBalances);
         emit WithdrawWithAdmin(msg.sender, totalBalances);
