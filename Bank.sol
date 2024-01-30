@@ -86,5 +86,6 @@ contract Bank {
             totalBalances -= amount;
             userBalances[msg.sender] -= amount;
         }
+        //todo sort top3 
     }
 }
