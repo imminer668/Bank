@@ -2,90 +2,109 @@
 pragma solidity ^0.8.20;
 
 contract Bank {
-    //setAdmin
-    address admin;
-    //balances User address => amount
-    mapping(address => uint) public userBalances;
+    // Maps each address's balance
+    mapping(address => uint256) private balances;
+    // Stores whether a user is registered
+    mapping(address => bool) private registeredUsers;
+    // Stores each user's loan balance
+    mapping(address => uint256) private loanBalances;
+    // Loan interest rate (assumed to be 10%)
+    uint256 private constant LOAN_INTEREST_RATE = 10;
 
-    //top3
-    address[3] public top3Address;
+    // Deposit event
+    event Deposited(address indexed account, uint256 amount);
+    // Withdrawal event
+    event Withdrawn(address indexed account, uint256 amount);
+    // Balance inquiry event
+    event BalanceChecked(address indexed account, uint256 balance);
+    // User registration event
+    event UserRegistered(address indexed account);
+    // Loan issuance event
+    event LoanIssued(address indexed account, uint256 amount);
+    // Loan repayment event
+    event LoanRepaid(address indexed account, uint256 amount);
 
-    //totalBalances
-    uint256 public totalBalances = 0;
+    // User registration function
+    function register() public {
+        require(!registeredUsers[msg.sender], "User already registered");
 
-    event Deposit(
-        address user,
-        uint256 value,
-        uint256 userBalances,
-        uint256 totalBalances
-    );
-    event Top3Is(address user1, address user2, address user3);
-    event WithdrawWithAdmin(address user, uint256 value);
-    event Withdraw(address user, uint256 value);
+        // Register the user
+        registeredUsers[msg.sender] = true;
 
-    constructor() {
-        admin = msg.sender;
+        // Emit the registration event
+        emit UserRegistered(msg.sender);
     }
 
+    // Deposit function
     function deposit() public payable {
-        require(msg.value > 0, "Eth must be greater than 0.");
-        uint256 data = userBalances[msg.sender] + msg.value;
-        userBalances[msg.sender] = data;
-        totalBalances = totalBalances + msg.value;
-        sort(msg.sender, data);
-        emit Deposit(msg.sender, msg.value, data, totalBalances);
+        require(msg.value > 0, "You must deposit some ether");
+        
+        // Update user's balance
+        balances[msg.sender] += msg.value;
+        
+        // Emit the deposit event
+        emit Deposited(msg.sender, msg.value);
     }
 
-    function sort(address s, uint256 data) internal {
-        uint256 min = data;
-        uint8 index = 3;
-        for (uint8 i = 0; i < 3; i++) {
-            //exixt
-            if (top3Address[i] == s) {
-                index = 3;
-                break;
-            }
-            if (userBalances[top3Address[i]] < min) {
-                min = userBalances[top3Address[i]];
-                index = i;
-            }
-        }
-        if (index < 3) {
-            top3Address[index] = s;
-        }
-        emit Top3Is(top3Address[0], top3Address[1], top3Address[2]);
-    }
-
-    function getTop3() public view returns (address[3] memory) {
-        return top3Address;
-    }
-
-    function withdrawWithAdmin() public {
-        require(msg.sender == admin, "Only admin can withdraw eth.");
-        payable(msg.sender).transfer(totalBalances);
-        emit WithdrawWithAdmin(msg.sender, totalBalances);
-        totalBalances = 0;
-    }
-
+    // Withdrawal function
     function withdraw(uint256 amount) public {
-        require(userBalances[msg.sender] > 0, "Your eth balances is 0.");
-        require(
-            userBalances[msg.sender] >= amount,
-            "Your balances not enough."
-        );
+        require(balances[msg.sender] >= amount, "Insufficient balance");
+        
+        // Update balance
+        balances[msg.sender] -= amount;
+        
+        // Transfer the amount
+        payable(msg.sender).transfer(amount);
+        
+        // Emit the withdrawal event
+        emit Withdrawn(msg.sender, amount);
+    }
 
-        if (amount == 0) {
-            //withdraw all
-            payable(msg.sender).transfer(userBalances[msg.sender]);
-            emit Withdraw(msg.sender, userBalances[msg.sender]);
-            totalBalances -= userBalances[msg.sender];
-            userBalances[msg.sender] = 0;
-        } else {
-            payable(msg.sender).transfer(amount);
-            emit Withdraw(msg.sender, amount);
-            totalBalances -= amount;
-            userBalances[msg.sender] -= amount;
-        }
-        //todo sort top3 
+    // Balance inquiry function
+    function getBalance() public returns (uint256) {
+        uint256 balance = balances[msg.sender];
+        
+        // Emit the balance inquiry event
+        emit BalanceChecked(msg.sender, balance);
+        
+        return balance;
+    }
+
+    // Loan application function
+    function applyForLoan(uint256 amount) public {
+        require(registeredUsers[msg.sender], "User not registered");
+        require(amount > 0, "Loan amount must be greater than zero");
+        
+        // Issue the loan
+        loanBalances[msg.sender] += amount;
+
+        // Transfer the loan amount
+        payable(msg.sender).transfer(amount);
+        
+        // Emit the loan issuance event
+        emit LoanIssued(msg.sender, amount);
+    }
+
+    // Loan repayment function
+    function repayLoan(uint256 amount) public payable {
+        require(registeredUsers[msg.sender], "User not registered");
+        require(loanBalances[msg.sender] > 0, "No outstanding loan to repay");
+        require(msg.value >= amount, "Insufficient repayment amount");
+
+        // Calculate the interest
+        uint256 totalRepayment = (loanBalances[msg.sender] * (100 + LOAN_INTEREST_RATE)) / 100;
+
+        require(amount >= totalRepayment, "Repayment must cover the full loan and interest");
+
+        // Update the loan balance
+        loanBalances[msg.sender] = 0;
+
+        // Emit the loan repayment event
+        emit LoanRepaid(msg.sender, amount);
+    }
+
+    // Loan balance inquiry function
+    function getLoanBalance() public view returns (uint256) {
+        return loanBalances[msg.sender];
     }
 }
