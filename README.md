@@ -16,6 +16,10 @@ After withdrawal, the balance will be updated and the Withdrawal event will be t
 Users can check their bank balance.
 This feature will trigger the Balance Checked event to record the query.
 
+• User registration:
+Users can register by calling this function.
+Each user can only register once, and the UserRegistered event will be triggered after registration.
+
 
 # 编写一个Bank 合约:
 
@@ -32,3 +36,7 @@ This feature will trigger the Balance Checked event to record the query.
 • 查询余额 (getBalance)：
 用户可以查询自己在银行的余额。
 此功能会触发 BalanceChecked 事件以记录查询。
+
+• 用户注册 (register)：
+用户可以通过调用此函数进行注册。
+每个用户只能注册一次，注册后会触发 UserRegistered 事件。
