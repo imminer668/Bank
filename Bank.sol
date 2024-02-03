@@ -2,12 +2,19 @@
 pragma solidity ^0.8.20;
 
 contract Bank {
-    // Maps each address's balance
+    // Mapping to store the balance of each address
     mapping(address => uint256) private balances;
-    // Stores whether a user is registered
+    // Store whether a user is registered
     mapping(address => bool) private registeredUsers;
-    // Stores each user's loan balance
+    // Mapping to store each user's loan balance
     mapping(address => uint256) private loanBalances;
+    // Mapping to store each user's collateral balance
+    mapping(address => uint256) private collateralBalances;
+
+    // Collateral ratio and liquidation threshold
+    uint256 private constant LOAN_TO_VALUE_RATIO = 70; // 70%
+    uint256 private constant LIQUIDATION_THRESHOLD = 75; // 75%
+    
     // Loan interest rate (assumed to be 10%)
     uint256 private constant LOAN_INTEREST_RATE = 10;
 
@@ -15,14 +22,18 @@ contract Bank {
     event Deposited(address indexed account, uint256 amount);
     // Withdrawal event
     event Withdrawn(address indexed account, uint256 amount);
-    // Balance inquiry event
+    // Balance check event
     event BalanceChecked(address indexed account, uint256 balance);
     // User registration event
     event UserRegistered(address indexed account);
-    // Loan issuance event
+    // Loan event
     event LoanIssued(address indexed account, uint256 amount);
     // Loan repayment event
     event LoanRepaid(address indexed account, uint256 amount);
+    // Collateral event
+    event CollateralDeposited(address indexed account, uint256 amount);
+    // Liquidation event
+    event Liquidation(address indexed account, uint256 amount);
 
     // User registration function
     function register() public {
@@ -39,7 +50,7 @@ contract Bank {
     function deposit() public payable {
         require(msg.value > 0, "You must deposit some ether");
         
-        // Update user's balance
+        // Update user balance
         balances[msg.sender] += msg.value;
         
         // Emit the deposit event
@@ -60,14 +71,25 @@ contract Bank {
         emit Withdrawn(msg.sender, amount);
     }
 
-    // Balance inquiry function
+    // Balance check function
     function getBalance() public returns (uint256) {
         uint256 balance = balances[msg.sender];
         
-        // Emit the balance inquiry event
+        // Emit the balance check event
         emit BalanceChecked(msg.sender, balance);
         
         return balance;
+    }
+
+    // Collateral deposit function
+    function depositCollateral() public payable {
+        require(msg.value > 0, "You must deposit some ether as collateral");
+
+        // Update collateral balance
+        collateralBalances[msg.sender] += msg.value;
+
+        // Emit the collateral event
+        emit CollateralDeposited(msg.sender, msg.value);
     }
 
     // Loan application function
@@ -75,36 +97,67 @@ contract Bank {
         require(registeredUsers[msg.sender], "User not registered");
         require(amount > 0, "Loan amount must be greater than zero");
         
+        // Calculate the maximum loan amount
+        uint256 collateralValue = collateralBalances[msg.sender];
+        uint256 maxLoanAmount = (collateralValue * LOAN_TO_VALUE_RATIO) / 100;
+
+        require(amount <= maxLoanAmount, "Loan exceeds collateral value limit");
+
         // Issue the loan
         loanBalances[msg.sender] += amount;
 
         // Transfer the loan amount
         payable(msg.sender).transfer(amount);
         
-        // Emit the loan issuance event
+        // Emit the loan event
         emit LoanIssued(msg.sender, amount);
     }
 
-    // Loan repayment function
+    // Repayment function
     function repayLoan(uint256 amount) public payable {
         require(registeredUsers[msg.sender], "User not registered");
         require(loanBalances[msg.sender] > 0, "No outstanding loan to repay");
         require(msg.value >= amount, "Insufficient repayment amount");
 
-        // Calculate the interest
+        // Calculate interest
         uint256 totalRepayment = (loanBalances[msg.sender] * (100 + LOAN_INTEREST_RATE)) / 100;
 
         require(amount >= totalRepayment, "Repayment must cover the full loan and interest");
 
-        // Update the loan balance
+        // Update loan balance
         loanBalances[msg.sender] = 0;
 
-        // Emit the loan repayment event
+        // Emit the repayment event
         emit LoanRepaid(msg.sender, amount);
     }
 
-    // Loan balance inquiry function
+    // Check and trigger liquidation
+    function checkForLiquidation() public {
+        require(registeredUsers[msg.sender], "User not registered");
+        require(loanBalances[msg.sender] > 0, "No outstanding loan to check");
+
+        // Calculate collateral value and liquidation threshold
+        uint256 collateralValue = collateralBalances[msg.sender];
+        uint256 totalLoanAmount = loanBalances[msg.sender];
+        uint256 liquidationThreshold = (collateralValue * LIQUIDATION_THRESHOLD) / 100;
+
+        // If the loan amount exceeds 75% of collateral, trigger liquidation
+        if (totalLoanAmount > liquidationThreshold) {
+            // Emit the liquidation event
+            emit Liquidation(msg.sender, totalLoanAmount);
+            // Clear user's loan and collateral
+            loanBalances[msg.sender] = 0;
+            collateralBalances[msg.sender] = 0;
+        }
+    }
+
+    // Query loan balance
     function getLoanBalance() public view returns (uint256) {
         return loanBalances[msg.sender];
+    }
+
+    // Query collateral balance
+    function getCollateralBalance() public view returns (uint256) {
+        return collateralBalances[msg.sender];
     }
 }
