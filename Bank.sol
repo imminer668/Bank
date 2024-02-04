@@ -18,6 +18,9 @@ contract Bank {
     // Loan interest rate (assumed to be 10%)
     uint256 private constant LOAN_INTEREST_RATE = 10;
 
+    // Reentrancy guard
+    bool private locked;
+
     // Deposit event
     event Deposited(address indexed account, uint256 amount);
     // Withdrawal event
@@ -35,6 +38,14 @@ contract Bank {
     // Liquidation event
     event Liquidation(address indexed account, uint256 amount);
 
+    // Modifier to prevent reentrancy
+    modifier noReentrancy() {
+        require(!locked, "Reentrancy detected!");
+        locked = true; // Lock the function
+        _; // Execute the function
+        locked = false; // Unlock after execution
+    }
+
     // User registration function
     function register() public {
         require(!registeredUsers[msg.sender], "User already registered");
@@ -47,7 +58,7 @@ contract Bank {
     }
 
     // Deposit function
-    function deposit() public payable {
+    function deposit() public payable noReentrancy {
         require(msg.value > 0, "You must deposit some ether");
         
         // Update user balance
@@ -58,7 +69,7 @@ contract Bank {
     }
 
     // Withdrawal function
-    function withdraw(uint256 amount) public {
+    function withdraw(uint256 amount) public noReentrancy {
         require(balances[msg.sender] >= amount, "Insufficient balance");
         
         // Update balance
@@ -72,7 +83,7 @@ contract Bank {
     }
 
     // Balance check function
-    function getBalance() public returns (uint256) {
+    function getBalance() public noReentrancy returns (uint256) {
         uint256 balance = balances[msg.sender];
         
         // Emit the balance check event
@@ -82,7 +93,7 @@ contract Bank {
     }
 
     // Collateral deposit function
-    function depositCollateral() public payable {
+    function depositCollateral() public payable noReentrancy {
         require(msg.value > 0, "You must deposit some ether as collateral");
 
         // Update collateral balance
@@ -93,7 +104,7 @@ contract Bank {
     }
 
     // Loan application function
-    function applyForLoan(uint256 amount) public {
+    function applyForLoan(uint256 amount) public noReentrancy {
         require(registeredUsers[msg.sender], "User not registered");
         require(amount > 0, "Loan amount must be greater than zero");
         
@@ -114,7 +125,7 @@ contract Bank {
     }
 
     // Repayment function
-    function repayLoan(uint256 amount) public payable {
+    function repayLoan(uint256 amount) public payable noReentrancy {
         require(registeredUsers[msg.sender], "User not registered");
         require(loanBalances[msg.sender] > 0, "No outstanding loan to repay");
         require(msg.value >= amount, "Insufficient repayment amount");
@@ -132,7 +143,7 @@ contract Bank {
     }
 
     // Check and trigger liquidation
-    function checkForLiquidation() public {
+    function checkForLiquidation() public noReentrancy {
         require(registeredUsers[msg.sender], "User not registered");
         require(loanBalances[msg.sender] > 0, "No outstanding loan to check");
 
